@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - PlantHealthAI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <!-- Navigation Bar -->
+    <nav>
+        <div class="container nav-container">
+            <div class="logo">PlantHealthAI</div>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('index') }}#services">Services</a></li>
+                <li><a href="{{ url_for('index') }}#how-it-works">How It Works</a></li>
+                <li><a href="{{ url_for('analyze') }}">Analyze</a></li>
+                <li><a href="{{ url_for('index') }}#community">Community</a></li>
+                <li><a href="{{ url_for('index') }}#contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Error Section -->
+    <section class="error">
+        <div class="container">
+            <h2>An Error Occurred</h2>
+            <div class="error-message">
+                <p>{{ error }}</p>
+            </div>
+            <div class="buttons">
+                <a href="{{ url_for('analyze') }}" class="btn btn-primary">Try Again</a>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Return Home</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-container">
+            <div class="footer-links">
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('index') }}#services">Services</a>
+                <a href="{{ url_for('index') }}#how-it-works">How It Works</a>
+                <a href="{{ url_for('analyze') }}">Analyze</a>
+                <a href="{{ url_for('index') }}#community">Community</a>
+                <a href="{{ url_for('index') }}#contact">Contact</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+            </div>
+
+            <div class="social-links">
+                <a href="#" title="Facebook">FB</a>
+                <a href="#" title="Twitter">TW</a>
+                <a href="#" title="Instagram">IG</a>
+                <a href="#" title="WhatsApp">WA</a>
+                <a href="#" title="YouTube">YT</a>
+            </div>
+
+            <p class="copyright">© 2023 PlantHealthAI. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Results - PlantHealthAI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Add this CSS inside the <style> tag or your style.css file */
+
+        .result-image {
+            /* Adjust container styling if needed for alignment */
+            display: flex;
+            /* Use flexbox */
+            flex-direction: column;
+            /* Stack image and caption */
+            justify-content: center;
+            /* Center content horizontally */
+            align-items: center;
+            /* Center content vertically */
+            /* You might want to adjust flex-basis or width of result-image */
+        }
+
+        .circular-plot-image {
+            width: 280px;
+            /* --- SET YOUR DESIRED DIAMETER --- */
+            height: 280px;
+            /* --- MUST BE EQUAL TO WIDTH --- */
+            border-radius: 50%;
+            /* This makes the element circular */
+            object-fit: cover;
+            /* Crucial: Scales image to cover the area, cropping aspect ratio if needed */
+            object-position: center;
+            /* Ensures the center of the image is prioritized */
+            border: 4px solid #ffffff;
+            /* Optional: Add a theme-colored border */
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.15);
+            /* Optional: Add a subtle shadow */
+            background-color: #f0f0f0;
+            /* Optional: A light background in case image loading fails */
+            display: block;
+            /* Ensures it behaves like a block element */
+            margin-left: auto;
+            /* Helps centering if flexbox on parent isn't enough */
+            margin-right: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation Bar -->
+    <nav>
+        <div class="container nav-container">
+            <div class="logo">Vanaspati-AI</div>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('index') }}#services">Services</a></li>
+                <li><a href="{{ url_for('index') }}#how-it-works">How It Works</a></li>
+                <li><a href="{{ url_for('analyze') }}">Analyze</a></li>
+                <li><a href="{{ url_for('index') }}#community">Community</a></li>
+                <li><a href="{{ url_for('index') }}#contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Result Section -->
+    <section class="result">
+        <div class="container">
+            <h2>Analysis Results</h2>
+
+            <div class="result-image" style="border-radius: 60%;">
+                {% if plot_base64 %}
+                {# Added class="circular-plot-image" #}
+                <img class="circular-plot-image" src="data:image/png;base64,{{ plot_base64 }}"
+                    alt="Circular Analysis Result Plot">
+                <p style="font-size: 0.85em; color: #777; margin-top: 15px;"><i>Analysis plot (prediction overlay)</i>
+                </p> {# Increased margin top #}
+                {% else %}
+                <p style="color: #888; margin-top: 20px; border: 1px dashed #ccc; padding: 20px; border-radius: 5px;">
+                    (Analysis plot preview not available)</p> {# Added border radius #}
+                {% endif %}
+            </div>
+
+            <div class="result-details">
+                <h3>Plant Information</h3>
+                <p><strong>Plant Name:</strong> {{ plant_name }}</p>
+                <p><strong>Disease Name:</strong> {{ disease_name }}</p>
+                <p><strong>Confidence:</strong> {{ confidence|round(2) }}%</p>
+
+                {% if plant_health_data %}
+                <h3>Treatment Recommendations</h3>
+                <p><strong>Medicine Name:</strong> {{ plant_health_data.medicine_name|default('N/A') }}</p>
+                <p><strong>Medicine Procedure:</strong> {{ plant_health_data.medicine_procedure|default('N/A') }}
+                </p>
+
+                {% if plant_health_data.cure_steps is iterable and plant_health_data.cure_steps is not string %}
+                <h3>Cure Steps</h3>
+                <ul>
+                    {% for step in plant_health_data.cure_steps %}
+                    <li>{{ step }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p><strong>Cure Steps:</strong> {{ plant_health_data.cure_steps|default('N/A') }}</p>
+                {% endif %}
+
+                <p><strong>Disease Description:</strong> {{ plant_health_data.disease_description|default('N/A') }}
+                </p>
+                <p><strong>Environment:</strong> {{ plant_health_data.environment|default('N/A') }}</p>
+                <p><strong>Summary:</strong> {{ plant_health_data.summary|default('N/A') }}</p>
+                {% else %}
+                <p>No plant health information found in the database.</p>
+                {% endif %}
+
+                <div class="result-actions">
+                    <a href="{{ url_for('download_pdf') }}" class="btn btn-primary">Download PDF Report</a>
+                    <a href="{{ url_for('analyze') }}" class="btn btn-secondary">Analyze Another Plant</a>
+                </div>
+            </div>
+        </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-container">
+            <div class="footer-links">
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('index') }}#services">Services</a>
+                <a href="{{ url_for('index') }}#how-it-works">How It Works</a>
+                <a href="{{ url_for('analyze') }}">Analyze</a>
+                <a href="{{ url_for('index') }}#community">Community</a>
+                <a href="{{ url_for('index') }}#contact">Contact</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+            </div>
+
+            <div class="social-links">
+                <a href="#" title="Facebook">FB</a>
+                <a href="#" title="Twitter">TW</a>
+                <a href="#" title="Instagram">IG</a>
+                <a href="#" title="WhatsApp">WA</a>
+                <a href="#" title="YouTube">YT</a>
+            </div>
+
+            <p class="copyright">© 2023 PlantHealthAI. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+
+</html>
