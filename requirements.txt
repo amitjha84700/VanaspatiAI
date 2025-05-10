@@ -1,0 +1,8 @@
+Flask>=2.0.0
+Werkzeug>=2.0.0
+tensorflow>=2.8.0 # Important: Match the version your .h5 model was trained/saved with
+numpy>=1.21.0
+Pillow>=9.0.0
+matplotlib>=3.5.0
+pymongo[srv]>=4.0.0 # [srv] installs dnspython for Atlas SRV record resolution
+reportlab>=3.6.0
