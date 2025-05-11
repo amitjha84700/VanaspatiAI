@@ -19,7 +19,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT # For text alignmen
 from reportlab.lib.units import inch
 from reportlab.lib import colors # Import colors
 from PIL import Image as PILImage
-from datetime import datetime
+# from datetime import datetime # Already imported above
 
 # --- Constants and Configurations ---
 UPLOAD_FOLDER = 'uploads'
@@ -44,7 +44,7 @@ APP_NAME = "Vanaspati AI"
 FOOTER_SERVICE_POINTS = [
     "- Accurate Plant Disease Detection",
     "- Detailed Health Information & Care Steps",
-    "- Environment & Nutrient Recommendations" # Updated service point
+    "- Environment Recommendations"
 ]
 FOOTER_QUOTE = '"The glory of gardening: hands in the dirt, head in the sun, heart with nature. To nurture a garden is to feed not just the body, but the soul." - Alfred Austin'
 
@@ -253,10 +253,9 @@ def connect_to_mongodb():
         return None # Return None to indicate connection failure
 
 def get_plant_health_data(plant_name, disease_name):
-    """Retrieves plant health data (including nutrient info) from MongoDB."""
+    """Retrieves plant health data from MongoDB based on plant and disease name."""
     collection = connect_to_mongodb()
-
-    # Define default structure, now including nutrient_info
+    # Define default structure in case of DB error or no data found
     default_data = {
         "plant_name": plant_name,
         "disease_name": disease_name,
@@ -265,8 +264,7 @@ def get_plant_health_data(plant_name, disease_name):
         "cure_steps": ["N/A"],
         "disease_description": "Details not available.",
         "environment": "N/A",
-        "summary": "Information not found in database.",
-        "nutrient_info": None # Default nutrient info to None
+        "summary": "Information not found in database." # Default summary
     }
 
     if collection is None:
@@ -300,29 +298,6 @@ def get_plant_health_data(plant_name, disease_name):
             result_data["disease_description"] = plant_data_from_db.get("disease_description") or "No description available."
             result_data["environment"] = plant_data_from_db.get("environment") or "No specific environmental notes."
             result_data["summary"] = plant_data_from_db.get("summary") or "No summary provided."
-
-             # *** NEW: Get nutrient_info ***
-            db_nutrient_info = plant_data_from_db.get("nutrient_info")
-            if isinstance(db_nutrient_info, dict):
-                 # Basic validation: Ensure required keys have some content if they exist
-                valid_nutrient_info = {}
-                req_nut = db_nutrient_info.get('required_nutrients')
-                def_imp = db_nutrient_info.get('deficiency_impact')
-                perc_guide = db_nutrient_info.get('percentage_guidelines')
-
-                if req_nut and str(req_nut).strip(): valid_nutrient_info['required_nutrients'] = str(req_nut)
-                if def_imp and str(def_imp).strip(): valid_nutrient_info['deficiency_impact'] = str(def_imp)
-                if perc_guide and str(perc_guide).strip(): valid_nutrient_info['percentage_guidelines'] = str(perc_guide)
-
-                if valid_nutrient_info: # Only assign if we found some valid info
-                     result_data["nutrient_info"] = valid_nutrient_info
-                     app.logger.debug("Nutrient info processed from DB.")
-                else:
-                     app.logger.debug("Nutrient info field existed in DB but contained no valid data.")
-                     result_data["nutrient_info"] = None # Ensure it's None if empty/invalid
-            else:
-                 app.logger.debug("Nutrient info not found or not a dictionary in DB document.")
-                 result_data["nutrient_info"] = None # Ensure it's None if missing
 
             # Special handling for 'cure_steps' which should be a list of strings
             db_steps = plant_data_from_db.get('cure_steps')
@@ -360,37 +335,18 @@ def get_plant_health_data(plant_name, disease_name):
                 default_data["summary"] = "Plant diagnosed as healthy. Continue standard care and monitoring."
                 default_data["medicine_name"] = "Not Applicable"
                 default_data["medicine_procedure"] = "Not Applicable"
-                # Attempt to get 'healthy' nutrient info if it exists for the plant
-                healthy_query = {"plant_name": query_plant, "disease_name": "healthy"}
-                healthy_data_from_db = collection.find_one(healthy_query)
-                if healthy_data_from_db and isinstance(healthy_data_from_db.get("nutrient_info"), dict):
-                    db_nutrient_info = healthy_data_from_db.get("nutrient_info")
-                    valid_nutrient_info = {}
-                    req_nut = db_nutrient_info.get('required_nutrients')
-                    def_imp = db_nutrient_info.get('deficiency_impact') # Often less relevant for healthy
-                    perc_guide = db_nutrient_info.get('percentage_guidelines')
-                    if req_nut and str(req_nut).strip(): valid_nutrient_info['required_nutrients'] = str(req_nut)
-                    if def_imp and str(def_imp).strip(): valid_nutrient_info['deficiency_impact'] = str(def_imp)
-                    if perc_guide and str(perc_guide).strip(): valid_nutrient_info['percentage_guidelines'] = str(perc_guide)
-                    if valid_nutrient_info:
-                         default_data["nutrient_info"] = valid_nutrient_info
-                         app.logger.debug("Added general healthy nutrient info for this plant type.")
-
             else:
                  # Keep the default "Information not found" for non-healthy cases not in DB
                  default_data["summary"] = f"No specific management information found for '{disease_name}' on '{plant_name}' in the database."
-                 default_data["nutrient_info"] = None # Ensure nutrient info is None
 
             return default_data
     except Exception as e:
         app.logger.error(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", exc_info=True)
         app.logger.error(f"ERROR: Error during MongoDB query or data processing: {e}")
-        # Log the query safely (might contain PII if plant/disease names are sensitive, but generally ok)
-        app.logger.error(f"Query attempted: {{'plant_name': '{query_plant}', 'disease_name': '{query_disease}'}}") # Log query structure
+        app.logger.error(f"Query attempted: {query}")
         app.logger.error(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         # Return default data with an error message in summary
         default_data["summary"] = "A database query error occurred while retrieving details. Please check server logs."
-        default_data["nutrient_info"] = None # Ensure nutrient info is None on error
         return default_data
 
 
@@ -488,11 +444,18 @@ def footer_canvas(canvas, doc):
 
         # Draw lines from bottom up for right alignment
         line_height = 9 # Points
-        start_y_quote = footer_y + (len(lines) -1) * line_height # Adjust start based on number of lines
-        current_y_quote = start_y_quote
-        for line in reversed(lines): # Draw from top down
-             canvas.drawRightString(col2_x, current_y_quote, line)
-             current_y_quote -= line_height # Move down for next line
+        start_y_quote = footer_y # Adjusted to align better with col1
+        # Adjust start_y_quote if there are multiple lines, to draw from bottom up
+        if len(lines) > 1:
+            start_y_quote = footer_y - (len(lines) -1) * line_height + (line_height * (len(lines)-1) ) # This calculation needs checking
+            # Simplified: align the bottom of the last line with footer_y
+            start_y_quote = footer_y + (len(lines) - 1) * line_height
+
+
+        current_y_quote = footer_y # Start drawing first line of quote at footer_y
+        for line_idx, line in enumerate(reversed(lines)): # Draw from bottom up means processing reversed lines
+            canvas.drawRightString(col2_x, footer_y + line_idx * line_height, line)
+
 
         # Page Number (centered at the very bottom)
         page_num_text = f"Page {canvas.getPageNumber()}"
@@ -504,12 +467,11 @@ def footer_canvas(canvas, doc):
     except Exception as e:
         app.logger.error(f"ERROR drawing PDF footer: {e}", exc_info=True)
         # Ensure canvas state is restored even if error occurs
-        if canvas._code: # Check if there's anything to restore
+        if hasattr(canvas, '_code') and canvas._code: # Check if there's anything to restore
              canvas.restoreState()
 
-
 def generate_pdf_report(image_path, plant_name, disease_name, confidence, plant_health_data, username, name):
-    """Generates a PDF report with improved styling, nutrient table, and footer."""
+    """Generates a PDF report with improved styling and footer, returns buffer and filename."""
     now = datetime.now()
     # Sanitize username and name for filename, default if empty
     safe_username = secure_filename(username if username else "user")
@@ -525,8 +487,7 @@ def generate_pdf_report(image_path, plant_name, disease_name, confidence, plant_
     base_style = ParagraphStyle(name='Base', fontName='Helvetica', fontSize=10, leading=14, spaceAfter=6)
     # Headings
     styleH1 = ParagraphStyle(name='Heading1', parent=base_style, fontName='Helvetica-Bold', fontSize=18, alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor("#2c3e50")) # Dark Blue-Gray
-    styleH2 = ParagraphStyle(name='Heading2', parent=base_style, fontName='Helvetica-Bold', fontSize=13, spaceBefore=12, spaceAfter=6, textColor=colors.HexColor("#34495e"), borderPadding=2, borderBottomWidth=0.5, borderBottomColor=colors.lightgrey) # Underlined H2
-    styleH3 = ParagraphStyle(name='Heading3', parent=base_style, fontName='Helvetica-Bold', fontSize=11, spaceBefore=10, spaceAfter=4, textColor=colors.HexColor("#1a5f7a")) # Teal Sub-heading
+    styleH2 = ParagraphStyle(name='Heading2', parent=base_style, fontName='Helvetica-Bold', fontSize=13, spaceBefore=12, spaceAfter=6, textColor=colors.HexColor("#34495e"), borderPadding=2, borderColor=colors.lightgrey, borderBottomWidth=0.5) # Slightly Lighter Blue-Gray with underline
     # Body text
     styleN = ParagraphStyle(name='Normal', parent=base_style, alignment=TA_LEFT, spaceAfter=4)
     styleB = ParagraphStyle(name='BoldLabel', parent=styleN, fontName='Helvetica-Bold', textColor=colors.HexColor("#1a5f7a")) # Teal color for labels
@@ -535,7 +496,7 @@ def generate_pdf_report(image_path, plant_name, disease_name, confidence, plant_
     styleLi = ParagraphStyle(name='ListItem', parent=styleN, leftIndent=18, spaceBefore=0, spaceAfter=2, bulletIndent=5, firstLineIndent=0)
     # Captions
     styleCaption = ParagraphStyle(name='Caption', parent=styleN, fontSize=9, alignment=TA_CENTER, textColor=colors.grey, spaceBefore=2, spaceAfter=12)
-    # Content from DB (used in tables and general text)
+    # Content from DB
     styleDBContent = ParagraphStyle(name='DBContent', parent=styleN, spaceAfter=8) # More space after DB content paragraphs
 
     story = [] # ReportLab story list
@@ -555,6 +516,7 @@ def generate_pdf_report(image_path, plant_name, disease_name, confidence, plant_
         ('BOTTOMPADDING', (0,0), (-1,-1), 4),
         ('TOPPADDING', (0,0), (-1,-1), 4),
         ('LEFTPADDING', (0,0), (-1,-1), 0), # No extra padding for full width feel
+        # ('LINEABOVE', (0,0), (-1,0), 1, colors.darkgrey), # Optional top line
         ('LINEBELOW', (0,-1), (-1,-1), 0.5, colors.lightgrey), # Light bottom line
     ]))
     story.append(info_table)
@@ -638,16 +600,11 @@ def generate_pdf_report(image_path, plant_name, disease_name, confidence, plant_
                               plant_health_data.get('summary') == "Plant diagnosed as healthy. Continue standard care and monitoring.")
                         )
 
-    # Extract nutrient info for potential use
-    nutrient_info = plant_health_data.get('nutrient_info') if plant_health_data else None
-    has_valid_nutrient_info = isinstance(nutrient_info, dict) and any(nutrient_info.get(k) for k in ['required_nutrients', 'deficiency_impact', 'percentage_guidelines'])
-
-
     if has_valid_db_data or disease_name.lower() == "healthy":
         app.logger.debug("Found valid health data or 'healthy' diagnosis, adding details to PDF.")
 
         # Helper to add sections cleanly, handling None or 'N/A'
-        def add_section(title, content, style=styleDBContent, is_list=False, bold_title=True):
+        def add_section(title, content, style=styleDBContent, is_list=False):
             # Check if content is meaningful (not None, not 'N/A', not empty list/string)
             is_valid_content = False
             if is_list:
@@ -666,17 +623,20 @@ def generate_pdf_report(image_path, plant_name, disease_name, confidence, plant_
 
             # Add to story only if valid content exists
             if is_valid_content:
-                title_style = styleB if bold_title else styleN # Choose title style
-                story.append(Paragraph(f"{title}:", title_style)) # Use chosen style for title
+                story.append(Paragraph(f"{title}:", styleB)) # Use bold label style for title
                 if is_list:
                     for item in content:
                         # Basic escaping for safety, replace newlines for ReportLab
-                        escaped_item = item.replace('<', '<').replace('>', '>') # HTML escape basic tags
-                        story.append(Paragraph(f"• {escaped_item.replace(chr(10), '<br/>').replace('\n', '<br/>')}", styleLi, bulletText='•'))
+                        escaped_item = item.replace('<', '<').replace('>', '>') # Basic HTML escaping
+                        # *** MODIFICATION HERE TO FIX F-STRING SYNTAX ERROR ***
+                        # Perform replacements outside the f-string
+                        # chr(10) is equivalent to '\n', so one replace is enough.
+                        item_with_br = escaped_item.replace('\n', '<br/>')
+                        story.append(Paragraph(f"• {item_with_br}", styleLi, bulletText='•'))
                 else:
-                    escaped_content = content.replace('<', '<').replace('>', '>')
+                    escaped_content = content.replace('<', '<').replace('>', '>') # Basic HTML escaping
                     # Replace newlines with ReportLab's <br/> tag
-                    story.append(Paragraph(escaped_content.replace(chr(10), '<br/>').replace('\n', '<br/>'), style))
+                    story.append(Paragraph(escaped_content.replace('\n', '<br/>'), style)) # Use \n for consistency
                 story.append(Spacer(1, 0.08 * inch)) # Space after each section
             # else: app.logger.debug(f"Skipping PDF section '{title}' due to invalid/empty content: {content}")
 
@@ -689,71 +649,7 @@ def generate_pdf_report(image_path, plant_name, disease_name, confidence, plant_
             add_section("Application Procedure", plant_health_data.get('medicine_procedure'))
         add_section("Management & Care Steps", plant_health_data.get('cure_steps'), is_list=True) # This is expected to be a list
         add_section("Environmental Considerations", plant_health_data.get('environment'))
-
-        # --- Add Nutrient Information Section ---
-        if has_valid_nutrient_info:
-            story.append(Paragraph("Nutrient Information", styleH3)) # Sub-heading for nutrients
-            story.append(Spacer(1, 0.05 * inch))
-
-            # Prepare data for the table
-            nutrient_data_table_rows = []
-
-            # Helper to safely get nutrient text and format it
-            def get_nutrient_text(key):
-                text = nutrient_info.get(key, 'N/A')
-                if text and text != 'N/A':
-                    # Basic escaping and newline handling for paragraphs
-                    escaped_text = str(text).replace('<', '<').replace('>', '>')
-                    return escaped_text.replace(chr(10), '<br/>').replace('\n', '<br/>')
-                return None # Return None if empty or N/A
-
-            # Required Nutrients
-            req_nut_text = get_nutrient_text('required_nutrients')
-            if req_nut_text:
-                 nutrient_data_table_rows.append([
-                     Paragraph("Required Nutrients:", styleB), # Label column
-                     Paragraph(req_nut_text, styleDBContent)   # Content column
-                 ])
-
-            # Deficiency Impact
-            def_impact_text = get_nutrient_text('deficiency_impact')
-            if def_impact_text:
-                 nutrient_data_table_rows.append([
-                     Paragraph("Potential Impact of Imbalance:", styleB),
-                     Paragraph(def_impact_text, styleDBContent)
-                 ])
-
-            # Percentage Guidelines
-            perc_guide_text = get_nutrient_text('percentage_guidelines')
-            if perc_guide_text:
-                 nutrient_data_table_rows.append([
-                     Paragraph("General Guidelines:", styleB),
-                     Paragraph(perc_guide_text, styleDBContent)
-                 ])
-
-            # Create and style the table only if there are rows to display
-            if nutrient_data_table_rows:
-                nutrient_table = Table(nutrient_data_table_rows, colWidths=[1.7*inch, 4.8*inch]) # Adjust widths
-                nutrient_table.setStyle(TableStyle([
-                    ('VALIGN', (0,0), (-1,-1), 'TOP'),         # Align text to top of cell
-                    ('LEFTPADDING', (0,0), (-1,-1), 0),       # No extra left padding
-                    ('RIGHTPADDING', (0,0), (-1,-1), 5),      # Small right padding for content
-                    ('TOPPADDING', (0,0), (-1,-1), 2),        # Minimal top padding
-                    ('BOTTOMPADDING', (0,0), (-1,-1), 6),     # Space below text in cell
-                    # Optional: Add subtle background for label column
-                    # ('BACKGROUND', (0,0), (0,-1), colors.Color(red=(240/255), green=(240/255), blue=(240/255))), # Very light grey
-                    # ('LINEBELOW', (0,0), (-1,-1), 0.25, colors.lightgrey), # Optional fine lines between rows
-                ]))
-                story.append(nutrient_table)
-                story.append(Spacer(1, 0.15 * inch)) # Space after the nutrient table
-            else:
-                 app.logger.debug("No valid nutrient data rows to add to the PDF table.")
-        else:
-             app.logger.debug(f"Nutrient info not found or invalid for PDF report: {plant_name} - {disease_name}")
-
-
-        # Add Summary last
-        add_section("Summary / Key Advice", plant_health_data.get('summary'))
+        add_section("Summary / Key Advice", plant_health_data.get('summary')) # Add summary last
 
     else:
         # If no valid DB data AND not healthy, show the summary message (which indicates lack of data)
@@ -845,11 +741,7 @@ def result():
     try:
         # Secure filename and create full path
         filename = secure_filename(file.filename)
-        # Add timestamp/unique ID to filename to prevent overwrites if needed
-        # timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        # unique_filename = f"{timestamp}_{filename}"
-        # filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename) # Using original filename for simplicity now
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
         app.logger.info(f"Saving file '{filename}' from user '{username}' (name: '{name}') to '{filepath}'")
         file.save(filepath)
@@ -878,10 +770,8 @@ def result():
 
         # --- 5. Retrieve Data from DB ---
         app.logger.info(f"Retrieving health data for '{plant_name}' - '{disease_name}'")
-        plant_health_data = get_plant_health_data(plant_name, disease_name) # Includes nutrient info now
+        plant_health_data = get_plant_health_data(plant_name, disease_name)
         app.logger.info(f"Health data retrieval complete. Summary: {plant_health_data.get('summary', 'N/A')}")
-        app.logger.debug(f"Nutrient info retrieved: {'Yes' if plant_health_data.get('nutrient_info') else 'No'}")
-
 
         # --- 6. Generate Plot (Optional, e.g., for showing image with title) ---
         app.logger.info(f"Creating plot...")
@@ -911,10 +801,7 @@ def result():
         uploaded_image_url = None
         if filename:
              try:
-                  # Use the potentially unique filename if implemented above
-                  # display_filename = unique_filename if 'unique_filename' in locals() else filename
-                  display_filename = filename # Using original filename for now
-                  uploaded_image_url = url_for('uploaded_file', filename=display_filename, _external=False) # Use relative URL
+                  uploaded_image_url = url_for('uploaded_file', filename=filename, _external=False) # Use relative URL
                   app.logger.debug(f"Generated URL for uploaded image: {uploaded_image_url}")
              except Exception as url_err:
                   app.logger.error(f"Could not generate URL for uploaded file '{filename}': {url_err}", exc_info=True)
@@ -923,7 +810,7 @@ def result():
             "plant_name": plant_name,
             "disease_name": disease_name,
             "confidence": confidence,
-            "plant_health_data": plant_health_data, # Contains all DB info including nutrients
+            "plant_health_data": plant_health_data, # Contains all DB info
             "plot_base64": plot_base64, # Base64 string of the plot (image with title)
             "uploaded_image_url": uploaded_image_url, # URL to the raw uploaded image
             "pdf_available": bool(pdf_filename),
@@ -1093,4 +980,8 @@ if __name__ == '__main__':
 
     # Use Flask's development server. For production, use a WSGI server like Gunicorn or Waitress.
     # debug=True enables auto-reloading and detailed error pages (DO NOT use in production)
-    app.run(debug=True, host='0.0.0.0', port=5000) # host='0.0.0.0' makes it accessible on your network
+    # For Render.com, the PORT environment variable is set by Render.
+    # The host should be '0.0.0.0' to be accessible.
+    # Gunicorn will handle this when deployed, but for local testing app.run() is used.
+    port = int(os.environ.get("PORT", 5000)) # Use PORT from env var if available, else 5000
+    app.run(debug=False, host='0.0.0.0', port=port) # Set debug=False for production-like environment
